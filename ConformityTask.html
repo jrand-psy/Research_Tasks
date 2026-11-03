@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Art Evaluation & Life History Study</title>
+    <script src="https://unpkg.com/jspsych@7.3.3"></script>
+    <link href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" rel="stylesheet" type="text/css" />
+    
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.2"></script>
+
+    <style>
+      .art-stimulus {
+        max-width: 90vw;
+        max-height: 65vh;
+        width: auto;
+        height: auto;
+        border: 4px solid #333;
+        margin-bottom: 15px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+      }
+      .rating-context {
+        font-size: 18px;
+        color: #444;
+        margin-bottom: 30px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+      }
+      .target-source {
+        font-weight: bold;
+        color: #2c3e50;
+      }
+      .demo-form {
+        text-align: left; 
+        max-width: 600px; 
+        margin: auto; 
+        line-height: 1.8; 
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body></body>
+  <script>
+    // --- RANDOMIZATION VARIABLES ---
+    const version_index = Math.floor(Math.random() * 6);
+    const peer_first = Math.random() < 0.5; // 50/50 coin flip for block order
+
+    const jsPsych = initJsPsych({
+      on_finish: function() {
+        document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you for your participation!</h2><p>Saving your responses...</p></div>';
+
+        const all_data = jsPsych.data.get();
+        let flat_data = { 
+            Survey_Version: version_index + 1,
+            Block_Order: peer_first ? "Peer First" : "Critic First",
+            Total_Time_Seconds: Math.round((jsPsych.getTotalTime() / 1000) * 10) / 10 
+        };
+
+        // 1. Extract Demographics
+        const demo_trials = all_data.filter({trial_name: 'demographics'}).values();
+        if(demo_trials.length > 0) {
+          const demo_resp = demo_trials[0].response;
+          flat_data.Age = demo_resp.age;
+          flat_data.Gender = demo_resp.gender === 'Other' ? `Other (${demo_resp.gender_specify})` : demo_resp.gender;
+          
+          if(demo_resp.ethnicity) {
+            let eth_array = Array.isArray(demo_resp.ethnicity) ? demo_resp.ethnicity : [demo_resp.ethnicity];
+            
+            const otherIndex = eth_array.indexOf("Other");
+            if (otherIndex !== -1 && demo_resp.ethnicity_specify) {
+                eth_array[otherIndex] = `Other (${demo_resp.ethnicity_specify})`;
+            }
+            
+            flat_data.Ethnicity = eth_array.join(", ");
+          } else {
+            flat_data.Ethnicity = "None selected";
+          }
+        }
+
+        // 2. Extract Mini-K 
+        const minik_trials = all_data.filter({trial_name: 'mini_k'}).values();
+        if(minik_trials.length > 0) {
+          Object.keys(minik_trials[0].response).forEach(key => {
+            flat_data[key] = minik_trials[0].response[key] + 1; 
+          });
+        }
+
+        // 3. Extract Maranges Measure
+        const maranges_trials = all_data.filter({trial_name: 'maranges'}).values();
+        if(maranges_trials.length > 0) {
+          Object.keys(maranges_trials[0].response).forEach(key => {
+            flat_data[key] = maranges_trials[0].response[key] + 1; 
+          });
+        }
+
+        // 4. Extract Conformity Trials
+        const conformity_trials = all_data.filter({task: 'conformity'}).values();
+        conformity_trials.forEach(trial => {
+          const prefix = `${trial.conformity_target}_${trial.manipulated_valence}`;
+          flat_data[`${prefix}_image`] = trial.image_url;
+          flat_data[`${prefix}_fake_rating`] = trial.fake_rating_displayed;
+          
+          let respKey = Object.keys(trial.response)[0];
+          flat_data[`${prefix}_participant_rating`] = trial.response[respKey] + 1;
+        });
+
+        // Send data
+        fetch("https://script.google.com/macros/s/AKfycbz0qLVqMLLA8zeK874t3ZB1lYTb1AovRf0MGzQEHRbS4kvfrK2LYVxdIYAip0UxJirZSQ/exec", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(flat_data)
+        })
+        .then(response => response.json())
+        .then(data => {
+           if (data.status === "success") {
+             document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you for your participation!</h2><p>Your responses have been successfully recorded. You may now close this window.</p></div>';
+           } else {
+             throw new Error(data.message);
+           }
+        })
+        .catch(error => {
+           console.error('Error saving data:', error);
+           document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif; color:red;"><h2>Network Error</h2><p>There was an issue saving your data.</p></div>';
+        });
+      }
+    });
+
+    const abstract_images = [
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQAPx3tl1OFqR4iI_yYubc-tAboNL90GZGmkb2cpLlTMByI?download=1",
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQBR3S1XejBjSZAMVm50s_KvAW062Jg7Js16g3mtlpdwjV0?download=1",
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQBDP9H7ep-pTbA6hI8aDIfjASk4mrSDciRFN7xBLgW_gbQ?download=1",
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQBMlENEFQAJQpJ6_G4RUUFGAex4WIAOSS_328H97xwNnEE?download=1",
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQC5lmqZulSDT67GgsrJi4sUAfXJzGzTZJrE1-zC21tN1eE?download=1",
+      "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQAvCYUG0k6TTp3JtmcdM6RwAaCgwgSI5ht5R29ObudxDvQ?download=1"
+    ];
+
+    const survey_versions = [
+      [abstract_images[0], abstract_images[1], abstract_images[2], abstract_images[3]],
+      [abstract_images[1], abstract_images[2], abstract_images[3], abstract_images[4]],
+      [abstract_images[2], abstract_images[3], abstract_images[4], abstract_images[5]],
+      [abstract_images[3], abstract_images[4], abstract_images[5], abstract_images[0]],
+      [abstract_images[4], abstract_images[5], abstract_images[0], abstract_images[1]],
+      [abstract_images[5], abstract_images[0], abstract_images[1], abstract_images[2]]
+    ];
+
+    const participant_images = survey_versions[version_index];
+
+    function getFakeRating(valence) {
+      if (valence === 'high') {
+        return jsPsych.randomization.sampleWithoutReplacement([5, 6, 7], 1)[0];
+      } else {
+        return jsPsych.randomization.sampleWithoutReplacement([1, 2, 3], 1)[0];
+      }
+    }
+
+    const scale_mk_labels = ["-3<br>Disagree Strongly", "-2<br>Disagree Somewhat", "-1<br>Disagree Slightly", "0<br>Don't Know/Not Applicable", "1<br>Agree Slightly", "2<br>Agree Somewhat", "3<br>Agree Strongly"];
+    const scale_cuh_labels = ["1<br>Strongly Disagree", "2", "3", "4", "5", "6", "7<br>Strongly Agree"];
+    const rating_labels = ["1<br>Not at all", "2", "3", "4", "5", "6", "7<br>Very much"];
+
+    const timeline = [];
+
+    // --- 1. DEMOGRAPHICS ---
+    timeline.push({
+      type: jsPsychSurveyHtmlForm,
+      data: { trial_name: 'demographics' },
+      preamble: '<h3>Demographic Information</h3><p>Please provide the following information:</p>',
+      html: `
+        <div class="demo-form">
+          <p><b>Age:</b> <input type="number" name="age" required style="width: 60px;"></p>
+          <p><b>Gender:</b></p>
+          <div style="margin-left: 20px;">
+            <input type="radio" name="gender" value="Man" required> Man<br>
+            <input type="radio" name="gender" value="Woman"> Woman<br>
+            <input type="radio" name="gender" value="Other"> Other (please specify: <input type="text" name="gender_specify">)<br>
+          </div>
+          <p><b>Ethnicity (Select all that apply):</b></p>
+          <div style="margin-left: 20px;">
+            <input type="checkbox" name="ethnicity" value="White"> White<br>
+            <input type="checkbox" name="ethnicity" value="Black"> Black or African American<br>
+            <input type="checkbox" name="ethnicity" value="Hispanic"> Hispanic or Latino<br>
+            <input type="checkbox" name="ethnicity" value="Asian"> Asian<br>
+            <input type="checkbox" name="ethnicity" value="Native"> Native American or Alaska Native<br>
+            <input type="checkbox" name="ethnicity" value="Other"> Other (please specify: <input type="text" name="ethnicity_specify">)<br>
+          </div>
+          <br>
+        </div>
+      `
+    });
+
+    // --- 2. MINI-K (All 20 Items) ---
+    const minik_items = [
+      {prompt: "I can often tell how things will turn out.", name: 'minik_1', labels: scale_mk_labels, required: true},
+      {prompt: "I try to understand how I got into a situation to figure out how to handle it.", name: 'minik_2', labels: scale_mk_labels, required: true},
+      {prompt: "I often find the bright side to a bad situation.", name: 'minik_3', labels: scale_mk_labels, required: true},
+      {prompt: "I don't give up until I solve my problems.", name: 'minik_4', labels: scale_mk_labels, required: true},
+      {prompt: "I often make plans in advance.", name: 'minik_5', labels: scale_mk_labels, required: true},
+      {prompt: "I avoid taking risks.", name: 'minik_6', labels: scale_mk_labels, required: true},
+      {prompt: "While growing up, I had a close and warm relationship with my biological mother.", name: 'minik_7', labels: scale_mk_labels, required: true},
+      {prompt: "While growing up, I had a close and warm relationship with my biological father.", name: 'minik_8', labels: scale_mk_labels, required: true},
+      {prompt: "I have a close and warm relationship with my own children.", name: 'minik_9', labels: scale_mk_labels, required: true},
+      {prompt: "I have a close and warm romantic relationship with my sexual partner.", name: 'minik_10', labels: scale_mk_labels, required: true},
+      {prompt: "I would rather have one than several sexual relationships at a time.", name: 'minik_11', labels: scale_mk_labels, required: true},
+      {prompt: "I have to be closely attached to someone before I am comfortable having sex with them.", name: 'minik_12', labels: scale_mk_labels, required: true},
+      {prompt: "I am often in social contact with my blood relatives.", name: 'minik_13', labels: scale_mk_labels, required: true},
+      {prompt: "I often get emotional support and practical help from my blood relatives.", name: 'minik_14', labels: scale_mk_labels, required: true},
+      {prompt: "I often give emotional support and practical help to my blood relatives.", name: 'minik_15', labels: scale_mk_labels, required: true},
+      {prompt: "I am often in social contact with my friends.", name: 'minik_16', labels: scale_mk_labels, required: true},
+      {prompt: "I often get emotional support and practical help from my friends.", name: 'minik_17', labels: scale_mk_labels, required: true},
+      {prompt: "I often give emotional support and practical help to my friends.", name: 'minik_18', labels: scale_mk_labels, required: true},
+      {prompt: "I am closely connected to and involved in my community.", name: 'minik_19', labels: scale_mk_labels, required: true},
+      {prompt: "I am closely connected to and involved in my religion.", name: 'minik_20', labels: scale_mk_labels, required: true}
+    ];
+
+    timeline.push({
+      type: jsPsychSurveyLikert,
+      data: { trial_name: 'mini_k' },
+      preamble: '<h3>Questionnaire</h3><p>Please indicate how much you agree with the following statements:</p>',
+      questions: minik_items
+    });
+
+    // --- 3. MARANGES UNPREDICTABILITY & HARSHNESS ---
+    const maranges_items = [
+      {prompt: "I never knew whether my parents would be there to pick me up from school", name: 'cu_1', labels: scale_cuh_labels, required: true},
+      {prompt: "When I woke up, I often didn’t know what could happen in my house that day", name: 'cu_2', labels: scale_cuh_labels, required: true},
+      {prompt: "My family life was generally inconsistent and unpredictable from day-to-day", name: 'cu_3', labels: scale_cuh_labels, required: true},
+      {prompt: "When I left my house I was never quite certain what would happen in my neighborhood", name: 'cu_4', labels: scale_cuh_labels, required: true},
+      {prompt: "Things were often chaotic in my house", name: 'cu_5', labels: scale_cuh_labels, required: true},
+      {prompt: "I did not know what to expect from my family when I had friends over", name: 'cu_6', labels: scale_cuh_labels, required: true},
+      {prompt: "My family environment was often tense and on edge", name: 'cu_7', labels: scale_cuh_labels, required: true},
+      {prompt: "I did not know when I would see my parent(s)", name: 'cu_8', labels: scale_cuh_labels, required: true},
+      {prompt: "I could not predict which of many caretakers (e.g., babysitters, nannies, neighbors, family) would be watching me", name: 'cu_9', labels: scale_cuh_labels, required: true},
+      {prompt: "I was never certain where it was safe to play", name: 'cu_10', labels: scale_cuh_labels, required: true},
+      {prompt: "The traffic around the house(s) I lived was unpredictable and chaotic", name: 'cu_11', labels: scale_cuh_labels, required: true},
+      {prompt: "People often moved in and out of my house fairly frequently", name: 'cu_12', labels: scale_cuh_labels, required: true},
+      {prompt: "I often did not know what to expect from other students at school", name: 'cu_13', labels: scale_cuh_labels, required: true},
+      {prompt: "I had a hard time knowing what my parent(s) or other people in my house were going to say", name: 'cu_14', labels: scale_cuh_labels, required: true},
+      {prompt: "My family had a consistent schedule, so I knew what to expect each day.", name: 'cu_15_rev', labels: scale_cuh_labels, required: true},
+      {prompt: "Despite how much my parents worked, my family rarely had enough money for luxury items", name: 'ch_1', labels: scale_cuh_labels, required: true},
+      {prompt: "My family rarely had enough money to go out for a nice dinner", name: 'ch_2', labels: scale_cuh_labels, required: true},
+      {prompt: "Growing up, I rarely got spoiled because money was so tight", name: 'ch_3', labels: scale_cuh_labels, required: true},
+      {prompt: "My family was strained financially", name: 'ch_4', labels: scale_cuh_labels, required: true},
+      {prompt: "I felt uncomfortable asking my parents for money because money was tight", name: 'ch_5', labels: scale_cuh_labels, required: true},
+      {prompt: "We had to try to save money when shopping for anything", name: 'ch_6', labels: scale_cuh_labels, required: true},
+      {prompt: "I never had the newest style of shoes or clothes", name: 'ch_7', labels: scale_cuh_labels, required: true},
+      {prompt: "My family and I were usually able to purchase expensive presents for holidays, birthdays, etc.", name: 'ch_8_rev', labels: scale_cuh_labels, required: true},
+      {prompt: "I felt relatively wealthy compared with other kids in my school.", name: 'ch_9_rev', labels: scale_cuh_labels, required: true},
+      {prompt: "I grew up in a relatively wealthy neighborhood.", name: 'ch_10_rev', labels: scale_cuh_labels, required: true},
+      {prompt: "My family usually had enough money for things when I was growing up.", name: 'ch_11_rev', labels: scale_cuh_labels, required: true}
+    ];
+
+    timeline.push({
+      type: jsPsychSurveyLikert,
+      data: { trial_name: 'maranges' },
+      preamble: '<h3>Childhood Environment</h3><p>Think back to your life when you were younger than 10. This time includes preschool, kindergarten, and the first few years of elementary school. Please rate the extent to which you agree with the following:</p>',
+      questions: maranges_items
+    });
+
+    // --- 4. CONFORMITY TASK ---
+    function createConformityTrial(img_url, source, valence) {
+      const fake_rating = getFakeRating(valence);
+      const source_text = source === 'peer' 
+        ? "A group of <span class='target-source'>previous student peers</span>" 
+        : "A panel of <span class='target-source'>professional art critics</span>";
+
+      return {
+        type: jsPsychSurveyLikert,
+        preamble: `
+          <div style="text-align: center;">
+              <img src="${img_url}" class="art-stimulus">
+              <div class="rating-context">
+                  ${source_text} gave this piece an average rating of <strong>${fake_rating} out of 7</strong>.
+              </div>
+          </div>
+        `,
+        questions: [{
+            prompt: "<b>Please rate the extent to which you like this image.</b>",
+            name: `rating_${source}_${valence}`,
+            labels: rating_labels,
+            required: true
+        }],
+        data: {
+          task: 'conformity',
+          conformity_target: source,
+          manipulated_valence: valence,
+          fake_rating_displayed: fake_rating,
+          image_url: img_url
+        }
+      };
+    }
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div style="max-width: 800px; text-align: left; line-height: 1.6;">
+            <h2>Art Evaluation Task</h2>
+            <p>In this final task, you will be asked to view four abstract images and rate how much you like them.</p>
+            <p>To provide you with some context, we will also show you how other groups have rated these exact same pieces.</p>
+            <p>Press any key to begin.</p>
+        </div>
+      `
+    });
+
+    const peer_trials = [
+      createConformityTrial(participant_images[0], 'peer', 'high'),
+      createConformityTrial(participant_images[1], 'peer', 'low')
+    ];
+    
+    const critic_trials = [
+      createConformityTrial(participant_images[2], 'critic', 'high'),
+      createConformityTrial(participant_images[3], 'critic', 'low')
+    ];
+
+    if (peer_first) {
+      timeline.push(peer_trials[0], peer_trials[1], critic_trials[0], critic_trials[1]);
+    } else {
+      timeline.push(critic_trials[0], critic_trials[1], peer_trials[0], peer_trials[1]);
+    }
+
+    jsPsych.run(timeline);
+  </script>
+</html>
