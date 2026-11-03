@@ -54,7 +54,7 @@
 
         // 2. The base URL of your Qualtrics survey
         // (Replace this with your actual Qualtrics anonymous link)
-        const qualtrics_url = "https://uco.co1.qualtrics.com/jfe/form/SV_06gz1J2AbMr25ls";
+        const qualtrics_url = "https://yourschool.qualtrics.com/jfe/form/SV_1234567890";
 
         // 3. Display a brief loading message while the redirect processes
         document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you!</h2><p>Returning you to the main survey...</p></div>';
@@ -353,4 +353,15 @@
     
     const critic_trials = [
       createConformityTrial(participant_images[2], 'critic', 'high'),
-      createConformityTrial(participant_images[3], 'critic
+      createConformityTrial(participant_images[3], 'critic', 'low')
+    ];
+
+    if (peer_first) {
+      timeline.push(peer_trials[0], peer_trials[1], critic_trials[0], critic_trials[1]);
+    } else {
+      timeline.push(critic_trials[0], critic_trials[1], peer_trials[0], peer_trials[1]);
+    }
+
+    jsPsych.run(timeline);
+  </script>
+</html>
