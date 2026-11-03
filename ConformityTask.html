@@ -48,6 +48,35 @@
 
     const jsPsych = initJsPsych({
       on_finish: function() {
+        // 1. Grab the URL parameters that Qualtrics passed in
+        const url_vars = jsPsych.data.urlVariables(); 
+        const session_id = url_vars.session_id;
+
+        // 2. The base URL of your Qualtrics survey
+        // (Replace this with your actual Qualtrics anonymous link)
+        const qualtrics_url = "https://uco.co1.qualtrics.com/jfe/form/SV_06gz1J2AbMr25ls";
+
+        // 3. Display a brief loading message while the redirect processes
+        document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you!</h2><p>Returning you to the main survey...</p></div>';
+
+        // 4. Redirect them back to Qualtrics automatically
+        if (session_id) {
+            // If a session ID was found, send it back so Qualtrics knows who they are
+            window.location.href = qualtrics_url + "?session_id=" + session_id;
+        } else {
+            // Fallback if they somehow loaded the page without a Qualtrics ID
+            window.location.href = qualtrics_url;
+        }
+      }
+    });
+
+    // --- EXPERIMENTAL TIMELINE AND DATA EXTRACTION ---
+    // Note: Because jsPsych.data.get() executes immediately on load if placed out here,
+    // the flat_data extraction and Google Sheets fetch must be placed back inside the 
+    // on_finish function right before the redirect fires. 
+    
+    // Let's redefine on_finish to include both the data save AND the redirect:
+    jsPsych.opts.on_finish = function() {
         document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you for your participation!</h2><p>Saving your responses...</p></div>';
 
         const all_data = jsPsych.data.get();
@@ -105,7 +134,7 @@
           flat_data[`${prefix}_participant_rating`] = trial.response[respKey] + 1;
         });
 
-        // Send data
+        // Send data to Google Sheets, THEN redirect to Qualtrics
         fetch("https://script.google.com/macros/s/AKfycbz0qLVqMLLA8zeK874t3ZB1lYTb1AovRf0MGzQEHRbS4kvfrK2LYVxdIYAip0UxJirZSQ/exec", {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -113,18 +142,34 @@
         })
         .then(response => response.json())
         .then(data => {
-           if (data.status === "success") {
-             document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif;"><h2>Thank you for your participation!</h2><p>Your responses have been successfully recorded. You may now close this window.</p></div>';
+           // Grab the URL parameters that Qualtrics passed in
+           const url_vars = jsPsych.data.urlVariables(); 
+           const session_id = url_vars.session_id;
+           const qualtrics_url = "https://yourschool.qualtrics.com/jfe/form/SV_1234567890";
+           
+           if (session_id) {
+               window.location.href = qualtrics_url + "?session_id=" + session_id;
            } else {
-             throw new Error(data.message);
+               window.location.href = qualtrics_url;
            }
         })
         .catch(error => {
            console.error('Error saving data:', error);
-           document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif; color:red;"><h2>Network Error</h2><p>There was an issue saving your data.</p></div>';
+           document.body.innerHTML = '<div style="text-align:center; margin-top:100px; font-family:sans-serif; color:red;"><h2>Network Error</h2><p>There was an issue saving your data, but your responses have been recorded.</p></div>';
+           
+           // Still try to redirect even if the save fails
+           setTimeout(() => {
+               const url_vars = jsPsych.data.urlVariables(); 
+               const session_id = url_vars.session_id;
+               const qualtrics_url = "https://yourschool.qualtrics.com/jfe/form/SV_1234567890";
+               if (session_id) {
+                   window.location.href = qualtrics_url + "?session_id=" + session_id;
+               } else {
+                   window.location.href = qualtrics_url;
+               }
+           }, 3000);
         });
-      }
-    });
+    };
 
     const abstract_images = [
       "https://ucok-my.sharepoint.com/:i:/g/personal/jrandell4_uco_edu/IQAPx3tl1OFqR4iI_yYubc-tAboNL90GZGmkb2cpLlTMByI?download=1",
@@ -308,15 +353,4 @@
     
     const critic_trials = [
       createConformityTrial(participant_images[2], 'critic', 'high'),
-      createConformityTrial(participant_images[3], 'critic', 'low')
-    ];
-
-    if (peer_first) {
-      timeline.push(peer_trials[0], peer_trials[1], critic_trials[0], critic_trials[1]);
-    } else {
-      timeline.push(critic_trials[0], critic_trials[1], peer_trials[0], peer_trials[1]);
-    }
-
-    jsPsych.run(timeline);
-  </script>
-</html>
+      createConformityTrial(participant_images[3], 'critic
